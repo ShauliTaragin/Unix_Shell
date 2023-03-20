@@ -7,17 +7,26 @@
 #include "unistd.h"
 #include <string.h>
 
+char* prompt_str = "hello"; 
+
+void cHandler(int dummy) {
+    printf("You typed Control-C!\n");
+    printf("%s: ",prompt_str);
+    fflush(stdout);
+}
+
 int main() {
+signal(SIGINT, cHandler);
+
 char command[1024];
 char *token;
 char *outfile;
 char *errfile;
 int i, fd,fd_err, amper, redirect, retid, status, piping, argc1;
 int fildes[2];
-char *argv[1000],  *argv2[1000];
-char* prompt_str = "hello"; 
+char *argv[1000],  *argv2[1000] *keys[1000], *values[1000];
 char memory[20][1024];
-int location=0;
+int location=0, map_index=0;
 while (1)
 {   
     
@@ -89,6 +98,11 @@ while (1)
     /* Changing directory*/ 
     if (!strcmp(argv[0], "cd")){
         chdir(argv[1]);
+        continue;
+    }
+    if (argv[0][0]=='$' && (argc1 == 3) && (! strcmp(argv[1], "="))) {
+        keys[map_index]=argv[0];
+        values[map_index++]=argv[2];
         continue;
     }
     if ((! strcmp(argv[0], "prompt")) && (argc1 == 3) && (! strcmp(argv[1], "="))) {
