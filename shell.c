@@ -105,10 +105,62 @@ int main()
         fgets(command2, 1024, stdin);
         command2[strlen(command2) - 1] = '\0';
 
+        // everytime he presses up or down i present the previous/next command. once he presses enter i execute that command and exit the arrow mode
+        int counter = location;
+        while (command2[0] == '\033')
+        {
+                    // system ("/bin/stty raw");
 
-        i=0;
-        words[i++]=strtok(command2," ");
-        while ((words[i]=strtok(NULL," "))!=NULL)
+        // system ("/bin/stty cooked");
+            switch (command2[2])
+            { // the real value
+            case 'A':
+                // code for arrow up
+                counter = (counter+19) % 20;
+                //maybe add if counter= location that we went through all 20 commands
+
+                if (memory[counter][0] == '\0')
+                { // reached the downmost command - stay on same previous command
+                    counter = (counter+1) % 20;
+                }
+                //present to the user the command which he navigated to
+                printf("%s\n", memory[counter]);
+                break;
+            case 'B':
+                // code for arrow down
+                counter = (counter + 1) % 20;
+                //maybe add if counter= location that we went through all 20 commands
+
+                if (memory[counter][0] == '\0')
+                { // reached the downmost command - stay on same previous command
+                    counter = (counter+19) % 20;
+                }
+                //present to the user the command which he navigated to
+                printf("%s\n", memory[counter]);
+                break;
+            }
+            fgets(command2, 1024, stdin);
+            if (command2[0] == '\n')//allow the user to press enter and choose the command we presented to him
+            {
+                for (int i = 0; i < 1024; i++)
+                {
+                    command2[i] = memory[counter][i];
+                }
+                break;
+            }
+            else //user pressed another arrow -  continue to next iteration
+            {
+                command2[strlen(command2) - 1] = '\0';//(need this in else otherwise seg fault)
+            }
+        }
+        if(command2[0] == '\0'){
+            printf("empty command\n");
+            continue;
+        }
+
+        i = 0;
+        words[i++] = strtok(command2, " ");
+        while ((words[i] = strtok(NULL, " ")) != NULL)
             i++;
 
         if (words[0][0] == '$' && (i == 3) && (!strcmp(words[1], "=")))
