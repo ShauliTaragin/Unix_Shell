@@ -21,7 +21,7 @@ int main()
 {
     signal(SIGINT, cHandler);
 
-    char command[1024],command2[1024];
+    char command[1024], command2[1024];
     char *token;
     char *outfile;
     char *errfile;
@@ -29,80 +29,107 @@ int main()
     int fildes[2];
     char *argv[1000], *argv2[1000];
     char *arg[100][1000];
-    char* words[1000];
+    char *words[1000];
     char keys[1000][1000], values[1000][1000];
     char memory[20][1024];
     int location = 0, map_index = 0;
-    //next 30 lines of code is for section 12. currently is blocking and only works at the beggining 
-    char c;
-    if (fork() == 0)
-        {
-            system ("/bin/stty raw");
-            while (( c=getchar()) != 'Q'){
-            
-            if (c== '\033') { // if the first value is esc
-                getchar(); // skip the [
-                switch(getchar()) { // the real value
-                    case 'A':
-                // code for arrow up
-                        printf("up\n");
-                        break;
-                    case 'B':
-                        // code for arrow down
-                        printf("down\n");
-                        break;
-                    case 'C':
-                        // code for arrow right
-                        printf("right\n");
-                        break;
-                    case 'D':
-                        // code for arrow left
-                        printf("left\n");
-                        break;
-                }
-            }
-            }
-            system ("/bin/stty cooked");
-    }
-    //till here
+
     while (1)
     {
         printf("%s: ", prompt_str);
+
         fgets(command2, 1024, stdin);
         command2[strlen(command2) - 1] = '\0';
 
+        // everytime he presses up or down i present the previous/next command. once he presses enter i execute that command and exit the arrow mode
+        int counter = location;
+        while (command2[0] == '\033')
+        {
+                    // system ("/bin/stty raw");
 
-        i=0;
-        words[i++]=strtok(command2," ");
-        while ((words[i]=strtok(NULL," "))!=NULL)
+        // system ("/bin/stty cooked");
+            switch (command2[2])
+            { // the real value
+            case 'A':
+                // code for arrow up
+                counter = (counter+19) % 20;
+                //maybe add if counter= location that we went through all 20 commands
+
+                if (memory[counter][0] == '\0')
+                { // reached the downmost command - stay on same previous command
+                    counter = (counter+1) % 20;
+                }
+                //present to the user the command which he navigated to
+                printf("%s\n", memory[counter]);
+                break;
+            case 'B':
+                // code for arrow down
+                counter = (counter + 1) % 20;
+                //maybe add if counter= location that we went through all 20 commands
+
+                if (memory[counter][0] == '\0')
+                { // reached the downmost command - stay on same previous command
+                    counter = (counter+19) % 20;
+                }
+                //present to the user the command which he navigated to
+                printf("%s\n", memory[counter]);
+                break;
+            }
+            fgets(command2, 1024, stdin);
+            if (command2[0] == '\n')//allow the user to press enter and choose the command we presented to him
+            {
+                for (int i = 0; i < 1024; i++)
+                {
+                    command2[i] = memory[counter][i];
+                }
+                break;
+            }
+            else //user pressed another arrow -  continue to next iteration
+            {
+                command2[strlen(command2) - 1] = '\0';//(need this in else otherwise seg fault)
+            }
+        }
+        if(command2[0] == '\0'){
+            printf("empty command\n");
+            continue;
+        }
+             
+        i = 0;
+        words[i++] = strtok(command2, " ");
+        while ((words[i] = strtok(NULL, " ")) != NULL)
             i++;
 
         if (words[0][0] == '$' && (i == 3) && (!strcmp(words[1], "=")))
         {
             memcpy(keys[map_index], words[0], strlen(words[0]));
-            memcpy(values[map_index++] , words[2], strlen(words[2]));
+            memcpy(values[map_index++], words[2], strlen(words[2]));
             continue;
         }
 
-        for (int j = 0; j < i; j++){
-            if (words[j][0]=='$' && words[j][1]!='?'){
-                for (int k = map_index; k >=0 ; k--)
+        for (int j = 0; j < i; j++)
+        {
+            if (words[j][0] == '$' && words[j][1] != '?')
+            {
+                for (int k = map_index; k >= 0; k--)
                 {
-                    if(! strcmp(words[j],keys[k])){
-                        words[j]=values[k];
+                    if (!strcmp(words[j], keys[k]))
+                    {
+                        words[j] = values[k];
                         break;
                     }
                 }
             }
         }
 
-        int c=0;
-        for (int j = 0; j < i; j++){
+        int c = 0;
+        for (int j = 0; j < i; j++)
+        {
             for (int k = 0; k < strlen(words[j]); k++)
             {
-                command[c++]=words[j][k];
+                command[c++] = words[j][k];
             }
-            if(j!=i-1) {
+            if (j != i - 1)
+            {
                 command[c++] = ' ';
             }
         }
@@ -146,7 +173,6 @@ int main()
         //     }
         //     args_pipe[i] = NULL;
 
-
         //     for (int j = 0; j < i; j++){
         //         int k=0;
         //         token = strtok (args_pipe[j]," ");
@@ -159,12 +185,9 @@ int main()
         //         arg[j][k] = NULL;
         //     }
 
-
-
         // }
 
         // else{
-
 
         // }
         /* parse command line */
@@ -173,9 +196,10 @@ int main()
         while (token != NULL)
         {
             argv[i] = token;
-            token = strtok (NULL, " ");
+            token = strtok(NULL, " ");
             i++;
-            if (token && ! strcmp(token, "|")) {
+            if (token && !strcmp(token, "|"))
+            {
                 piping = 1;
                 break;
             }
@@ -254,7 +278,7 @@ int main()
             outfile = argv[argc1 - 3];
             errfile = argv[argc1 - 1];
         }
-            // supporting a chain of redirection first output then error
+        // supporting a chain of redirection first output then error
         else if ((argc1 > 3) && (!strcmp(argv[argc1 - 4], "2>")) && (!strcmp(argv[argc1 - 2], ">")))
         {
             redirect = 3;
