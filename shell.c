@@ -10,6 +10,68 @@
 
 char *prompt_str = "hello";
 
+
+void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i){
+    if(i==0){
+        printf("in\n");
+        close(STDOUT_FILENO);
+        dup(fildes[0][1]);
+        close(fildes[0][1]);
+        close(fildes[0][0]);
+
+        execvp(pipes[0][0], pipes[0]);
+        perror("Error executing command");
+        printf("%d\n",i);
+        exit(1);
+    }
+    pipe(fildes[i-1]);
+    int pid;
+    if ((pid = fork()) == -1)
+    {
+        perror("Error forking");
+    }
+    else if (pid == 0)
+    {
+        pipe_func(num_pipes,pipes,fildes,i-1);
+    }
+    else{
+        printf("%d,%ld,%ld\n",i,(long)getpid(), (long)getppid());
+        /* Child process */
+
+        if (i == num_pipes-1)
+        {
+            printf("out\n");
+            close(STDIN_FILENO);
+            dup(fildes[i-1][0]);
+            close(fildes[i-1][1]);
+            close(fildes[i-1][0]);
+
+        }
+        else
+        {
+            printf("not happen\n");
+            close(STDIN_FILENO);
+            dup(fildes[i-1][0]);
+            close(STDOUT_FILENO);
+            dup(fildes[i][1]);
+
+
+            close(fildes[i-1][1]);
+            close(fildes[i-1][0]);
+            /* Middle commands */
+            close(fildes[i - 1][1]);
+            close(fildes[i][0]);
+
+        }
+        /* Execute command */
+        execvp(pipes[i][0], pipes[i]);
+        perror("Error executing command");
+        printf("%d\n",i);
+        exit(1);
+    }
+}
+
+
 void cHandler(int dummy)
 {
     printf("You typed Control-C!\n");
@@ -21,115 +83,60 @@ int main()
 {
     signal(SIGINT, cHandler);
 
-    char command[1024], command2[1024];
+    char command[1024],command2[1024],then_command[1025],else_command[1024];
+    int pipes_fd[1000][2];
     char *token;
     char *outfile;
     char *errfile;
-    int i, fd, fd_err, amper, redirect, retid, status, piping, argc1;
+    int i, fd, fd_err, amper, redirect, retid, status, piping, argc1,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes;
     int fildes[2];
-    char *argv[1000], *argv2[1000];
-    char *arg[100][1000];
-    char *words[1000];
+    char *argv[100][1000];
+    char* words[1000];
     char keys[1000][1000], values[1000][1000];
     char memory[20][1024];
     int location = 0, map_index = 0;
-
+    char c;
     while (1)
     {
-        printf("%s: ", prompt_str);
-
+        index++;
+        if(if_cond!=index-1 && then_cond!=index-1 && then_cond!=index-2 && else_cond!=index-1 && else_cond!=index-2){
+            printf("%s: ", prompt_str);
+        }
         fgets(command2, 1024, stdin);
         command2[strlen(command2) - 1] = '\0';
 
-        // everytime he presses up or down i present the previous/next command. once he presses enter i execute that command and exit the arrow mode
-        int counter = location;
-        while (command2[0] == '\033')
-        {
-                    // system ("/bin/stty raw");
 
-        // system ("/bin/stty cooked");
-            switch (command2[2])
-            { // the real value
-            case 'A':
-                // code for arrow up
-                counter = (counter+19) % 20;
-                //maybe add if counter= location that we went through all 20 commands
-
-                if (memory[counter][0] == '\0')
-                { // reached the downmost command - stay on same previous command
-                    counter = (counter+1) % 20;
-                }
-                //present to the user the command which he navigated to
-                printf("%s\n", memory[counter]);
-                break;
-            case 'B':
-                // code for arrow down
-                counter = (counter + 1) % 20;
-                //maybe add if counter= location that we went through all 20 commands
-
-                if (memory[counter][0] == '\0')
-                { // reached the downmost command - stay on same previous command
-                    counter = (counter+19) % 20;
-                }
-                //present to the user the command which he navigated to
-                printf("%s\n", memory[counter]);
-                break;
-            }
-            fgets(command2, 1024, stdin);
-            if (command2[0] == '\n')//allow the user to press enter and choose the command we presented to him
-            {
-                for (int i = 0; i < 1024; i++)
-                {
-                    command2[i] = memory[counter][i];
-                }
-                break;
-            }
-            else //user pressed another arrow -  continue to next iteration
-            {
-                command2[strlen(command2) - 1] = '\0';//(need this in else otherwise seg fault)
-            }
-        }
-        if(command2[0] == '\0'){
-            printf("empty command\n");
-            continue;
-        }
-             
-        i = 0;
-        words[i++] = strtok(command2, " ");
-        while ((words[i] = strtok(NULL, " ")) != NULL)
+        i=0;
+        words[i++]=strtok(command2," ");
+        while ((words[i]=strtok(NULL," "))!=NULL)
             i++;
 
         if (words[0][0] == '$' && (i == 3) && (!strcmp(words[1], "=")))
         {
             memcpy(keys[map_index], words[0], strlen(words[0]));
-            memcpy(values[map_index++], words[2], strlen(words[2]));
+            memcpy(values[map_index++] , words[2], strlen(words[2]));
             continue;
         }
 
-        for (int j = 0; j < i; j++)
-        {
-            if (words[j][0] == '$' && words[j][1] != '?')
-            {
-                for (int k = map_index; k >= 0; k--)
+        for (int j = 0; j < i; j++){
+            if (words[j][0]=='$' && words[j][1]!='?'){
+                for (int k = map_index; k >=0 ; k--)
                 {
-                    if (!strcmp(words[j], keys[k]))
-                    {
-                        words[j] = values[k];
+                    if(! strcmp(words[j],keys[k])){
+                        words[j]=values[k];
                         break;
                     }
                 }
             }
         }
 
-        int c = 0;
-        for (int j = 0; j < i; j++)
-        {
+        int c=0;
+        for (int j = 0; j < i; j++){
             for (int k = 0; k < strlen(words[j]); k++)
             {
-                command[c++] = words[j][k];
+                command[c++]=words[j][k];
             }
-            if (j != i - 1)
-            {
+            if(j!=i-1) {
                 command[c++] = ' ';
             }
         }
@@ -152,157 +159,173 @@ int main()
             location = (location + 1) % 20;
         }
 
-        // piping !!!!!!!!!!!!!!!!!!!!!
-        // for (int i = 0; i < 1024; i++)
-        // {
-        //     if (command[i]=='|'){
-        //         piping=1;
-        //         break;
-        //     }
-        // }
-        // if(piping){
+        if(then_cond==index-1){
+            strcpy(then_command, command);
+            continue;
+        }
+        if(else_cond==index-1){
+            strcpy(else_command, command);
+            continue;
+        }
+        if(!strcmp(command,"fi")){
+            if(!status){
+                strcpy(command, then_command);
+            }
+            else{
+                strcpy(command, else_command);
+            }
+        }
 
-        //     i = 0;
-        //     token = strtok (command,"|");
-        //     char* args_pipe[100];
-        //     while (token != NULL)
-        //     {
-        //         args_pipe[i] = token;
-        //         token = strtok (NULL, "|");
-        //         i++;
-        //     }
-        //     args_pipe[i] = NULL;
-
-        //     for (int j = 0; j < i; j++){
-        //         int k=0;
-        //         token = strtok (args_pipe[j]," ");
-        //         while (token != NULL)
-        //         {
-        //             arg[j][k] = token;
-        //             token = strtok (NULL, " ");
-        //             k++;
-        //         }
-        //         arg[j][k] = NULL;
-        //     }
-
-        // }
-
-        // else{
-
-        // }
-        /* parse command line */
         i = 0;
-        token = strtok(command, " ");
+        token = strtok (command,"|");
+        char* args_pipe[100];
         while (token != NULL)
         {
-            argv[i] = token;
-            token = strtok(NULL, " ");
+            args_pipe[i] = token;
+            token = strtok (NULL, "|");
             i++;
-            if (token && !strcmp(token, "|"))
-            {
-                piping = 1;
-                break;
-            }
         }
-        argv[i] = NULL;
-        argc1 = i;
+        if(i>1){
+            piping=1;
+        }
+        args_pipe[i] = NULL;
+        num_pipes=i;
 
-        /* Is command empty */
-        if (argv[0] == NULL)
-            continue;
 
-        if (piping)
-        {
-            i = 0;
+        for (int j = 0; j < i; j++){
+            int k=0;
+            token = strtok (args_pipe[j]," ");
             while (token != NULL)
             {
-                token = strtok(NULL, " ");
-                argv2[i] = token;
-                i++;
+                argv[j][k] = token;
+                token = strtok (NULL, " ");
+                k++;
             }
-            argv2[i] = NULL;
+            if(j==0){
+                argc1=k;
+            }
+            argv[j][k] = NULL;
         }
 
-        if (!strcmp(argv[0], "quit"))
+        /* Is command empty */
+        if (argv[0][0] == NULL)
+            continue;
+
+        if (!strcmp(argv[0][0], "if")){
+            if_cond=index;
+            for (int i = 0; i < argc1; i++)
+            {
+                argv[0][i]=argv[0][i+1];
+            }
+            memset(else_command, '\0', sizeof(else_command));
+            memset(then_command, '\0', sizeof(then_command));
+            argc1--;
+        }
+
+        if (!strcmp(argv[0][0], "then") && (argc1 == 1) && if_cond==index-1){
+            then_cond=index;
+            continue;
+        }
+
+        if (!strcmp(argv[0][0], "else") && (argc1 == 1) && then_cond==index-2){
+            else_cond=index;
+            continue;
+        }
+
+
+        if (!strcmp(argv[0][0], "read") && (argc1 == 2))
+        {
+            char str[1024];
+            fgets(str, 1024, stdin);
+            str[strlen(str) - 1] = '\0';
+            keys[map_index][0]='$';
+            memcpy(keys[map_index]+1, argv[0][1], strlen(argv[0][1]));
+            memcpy(values[map_index++] , str, strlen(str));
+            continue;
+        }
+
+
+        if (!strcmp(argv[0][0], "quit"))
         { // allow user to exit
             printf("exiting the program\n");
             exit(0);
         }
 
-        if (!strcmp(argv[argc1 - 1], "!!"))
+        if (!strcmp(argv[0][argc1 - 1], "!!"))
         {
             amper = 1;
-            argv[argc1 - 1] = NULL;
+            argv[0][argc1 - 1] = NULL;
         }
 
         /* Does command line end with & */
-        if (!strcmp(argv[argc1 - 1], "&"))
+        if (!strcmp(argv[0][argc1 - 1], "&"))
         {
             amper = 1;
-            argv[argc1 - 1] = NULL;
+            argv[0][argc1 - 1] = NULL;
         }
         else
             amper = 0;
         /* Changing directory*/
-        if (!strcmp(argv[0], "cd"))
+        if (!strcmp(argv[0][0], "cd"))
         {
-            chdir(argv[1]);
+            chdir(argv[0][1]);
             continue;
         }
 
-        if ((!strcmp(argv[0], "prompt")) && (argc1 == 3) && (!strcmp(argv[1], "=")))
+
+        if ((!strcmp(argv[0][0], "prompt")) && (argc1 == 3) && (!strcmp(argv[0][1], "=")))
         {
-            prompt_str = argv[2];
+            prompt_str = argv[0][2];
             continue;
         }
-        if (!strcmp(argv[0], "echo") && (argc1 == 2) && !strcmp(argv[1], "$?"))
+        if (!strcmp(argv[0][0], "echo") && (argc1 == 2) && !strcmp(argv[0][1], "$?"))
         {
             printf("%d\n", status);
             continue;
         }
-        if (!strcmp(argv[0], "echo"))
+        if (!strcmp(argv[0][0], "echo"))
         {
-            for (int j = 1; argv[j] != NULL; j++)
+            for (int j = 1; argv[0][j] != NULL; j++)
             {
-                printf("%s ", argv[j]);
+                printf("%s ", argv[0][j]);
             }
             printf("\n");
             continue;
         }
 
         // supporting a chain of redirection first error then output
-        if ((argc1 > 3) && (!strcmp(argv[argc1 - 4], ">")) && (!strcmp(argv[argc1 - 2], "2>")))
+        if ((argc1 > 3) && (!strcmp(argv[0][argc1 - 4], ">")) && (!strcmp(argv[0][argc1 - 2], "2>")))
         {
             redirect = 3;
-            argv[argc1 - 4] = NULL;
-            outfile = argv[argc1 - 3];
-            errfile = argv[argc1 - 1];
+            argv[0][argc1 - 4] = NULL;
+            outfile = argv[0][argc1 - 3];
+            errfile = argv[0][argc1 - 1];
         }
-        // supporting a chain of redirection first output then error
-        else if ((argc1 > 3) && (!strcmp(argv[argc1 - 4], "2>")) && (!strcmp(argv[argc1 - 2], ">")))
+            // supporting a chain of redirection first output then error
+        else if ((argc1 > 3) && (!strcmp(argv[0][argc1 - 4], "2>")) && (!strcmp(argv[0][argc1 - 2], ">")))
         {
             redirect = 3;
-            argv[argc1 - 4] = NULL;
-            outfile = argv[argc1 - 1];
-            errfile = argv[argc1 - 3];
+            argv[0][argc1 - 4] = NULL;
+            outfile = argv[0][argc1 - 1];
+            errfile = argv[0][argc1 - 3];
         }
-        else if ((argc1 > 1) && !strcmp(argv[argc1 - 2], ">"))
+        else if ((argc1 > 1) && !strcmp(argv[0][argc1 - 2], ">"))
         {
             redirect = 1;
-            argv[argc1 - 2] = NULL;
-            outfile = argv[argc1 - 1];
+            argv[0][argc1 - 2] = NULL;
+            outfile = argv[0][argc1 - 1];
         }
-        else if ((argc1 > 1) && !strcmp(argv[argc1 - 2], "2>"))
+        else if ((argc1 > 1) && !strcmp(argv[0][argc1 - 2], "2>"))
         {
             redirect = 2;
-            argv[argc1 - 2] = NULL;
-            errfile = argv[argc1 - 1];
+            argv[0][argc1 - 2] = NULL;
+            errfile = argv[0][argc1 - 1];
         }
-        else if ((argc1 > 1) && !strcmp(argv[argc1 - 2], ">>"))
+        else if ((argc1 > 1) && !strcmp(argv[0][argc1 - 2], ">>"))
         {
             redirect = 4;
-            argv[argc1 - 2] = NULL;
-            outfile = argv[argc1 - 1];
+            argv[0][argc1 - 2] = NULL;
+            outfile = argv[0][argc1 - 1];
         }
         else
             redirect = 0;
@@ -312,7 +335,7 @@ int main()
         if (fork() == 0)
         {
             /* redirection of IO ? */
-            if (redirect == 1)
+            if (redirect == 1 && if_cond!=index)
             {
                 fd = creat(outfile, 0660);
                 close(STDOUT_FILENO);
@@ -321,7 +344,7 @@ int main()
                 /* stdout is now redirected */
             }
             /* redirection of ERR */
-            if (redirect == 2)
+            if (redirect == 2 && if_cond!=index)
             {
                 fd = creat(errfile, 0660);
                 close(STDERR_FILENO);
@@ -329,7 +352,7 @@ int main()
                 close(fd);
                 /* stderr is now redirected */
             }
-            if (redirect == 3)
+            if (redirect == 3 && if_cond!=index)
             {
                 fd_err = creat(errfile, 0660);
                 close(STDERR_FILENO);
@@ -340,7 +363,7 @@ int main()
                 dup(fd);
                 close(fd);
             }
-            if (redirect == 4)
+            if (redirect == 4 && if_cond!=index)
             {
                 fd = open(outfile, O_WRONLY | O_CREAT | O_APPEND, 0660);
                 close(STDOUT_FILENO);
@@ -348,31 +371,21 @@ int main()
                 close(fd);
                 /* stdout is now redirected and appended to outfile*/
             }
-            if (piping)
-            {
-                pipe(fildes);
-                if (fork() == 0)
-                {
-                    /* first component of command line */
-                    close(STDOUT_FILENO);
-                    dup(fildes[1]);
-                    close(fildes[1]);
-                    close(fildes[0]);
-                    /* stdout now goes to pipe */
-                    /* child process does command */
-                    execvp(argv[0], argv);
+            if (piping){
+
+                if (fork() == 0){
+                    pipe_func(num_pipes,argv,pipes_fd,num_pipes-1);
+                    exit(0);
                 }
-                /* 2nd command component of command line */
-                close(STDIN_FILENO);
-                dup(fildes[0]);
-                close(fildes[0]);
-                close(fildes[1]);
-                /* standard input now comes from pipe */
-                execvp(argv2[0], argv2);
+
             }
+
             else
             {
-                execvp(argv[0], argv);
+                if(if_cond==index){
+                    freopen("/dev/null", "w", stdout);
+                }
+                execvp(argv[0][0], argv[0]);
                 exit(1);
             }
         }
