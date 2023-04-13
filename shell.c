@@ -11,7 +11,7 @@
 char *prompt_str = "hello";
 #define  SIZE 10000
 
-void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i){
+void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i,int last_pipe_size){
     if(i==0){
         close(STDOUT_FILENO);
         dup(fildes[0][1]);
@@ -30,13 +30,22 @@ void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i)
     }
     else if (pid == 0)
     {
-        pipe_func(num_pipes,pipes,fildes,i-1);
+        pipe_func(num_pipes,pipes,fildes,i-1,last_pipe_size);
     }
     else{
         /* Child process */
 
         if (i == num_pipes-1)
         {
+
+            if ((last_pipe_size > 1) && !strcmp(pipes[i][last_pipe_size - 2], ">"))
+            {
+                pipes[i][last_pipe_size - 2] = NULL;
+                int fd = creat(pipes[i][last_pipe_size - 1], 0660);
+                close(STDOUT_FILENO);
+                dup(fd);
+                close(fd);
+            }
             close(STDIN_FILENO);
             dup(fildes[i-1][0]);
             close(fildes[i-1][1]);
@@ -82,7 +91,7 @@ int main()
     char *token;
     char *outfile;
     char *errfile;
-    int i = 0, fd = 0, fd_err = 0, amper = 0, redirect = 0, retid = 0, status = 0, piping = 0, argc1 = 0,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes=0;
+    int i = 0, fd = 0, fd_err = 0, amper = 0, redirect = 0, retid = 0, status = 0, piping = 0, argc1 = 0,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes=0,last_pipe_size;
     int fildes[2] = {0};
     char *argv[100][1000] = {0};
     char* words[1000] = {0};
@@ -237,7 +246,6 @@ int main()
         args_pipe[i] = NULL;
         num_pipes=i;
 
-
         for (int j = 0; j < i; j++){
             int k=0;
             token = strtok (args_pipe[j]," ");
@@ -249,6 +257,9 @@ int main()
             }
             if(j==0){
                 argc1=k;
+            }
+            if(j==i-1){
+                last_pipe_size=k;
             }
             argv[j][k] = NULL;
         }
@@ -329,15 +340,6 @@ int main()
             printf("%d\n", status);
             continue;
         }
-        // if (!strcmp(argv[0][0], "echo"))
-        // {
-        //     for (int j = 1; argv[0][j] != NULL; j++)
-        //     {
-        //         printf("%s ", argv[0][j]);
-        //     }
-        //     printf("\n");
-        //     continue;
-        // }
 
         // supporting a chain of redirection first error then output
         if ((argc1 > 3) && (!strcmp(argv[0][argc1 - 4], ">")) && (!strcmp(argv[0][argc1 - 2], "2>")))
@@ -418,7 +420,7 @@ int main()
                 /* stdout is now redirected and appended to outfile*/
             }
             if (piping){
-                pipe_func(num_pipes,argv,pipes_fd,num_pipes-1);
+                pipe_func(num_pipes,argv,pipes_fd,num_pipes-1,last_pipe_size);
 
             }
 
