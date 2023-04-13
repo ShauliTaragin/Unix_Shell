@@ -9,7 +9,7 @@
 #include <sys/types.h>
 
 char *prompt_str = "hello";
-
+#define  SIZE 10000
 
 void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i){
     if(i==0){
@@ -82,17 +82,19 @@ int main()
 {
     signal(SIGINT, cHandler);
 
-    char command[1024],command2[1024],then_command[1025],else_command[1024];
-    int pipes_fd[1000][2];
+    char command[SIZE],command2[SIZE],then_command[SIZE],else_command[SIZE];
+    int pipes_fd[1000][2] = {0};
     char *token;
     char *outfile;
     char *errfile;
-    int i, fd, fd_err, amper, redirect, retid, status, piping, argc1,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes;
-    char *argv[100][1000];
-    char* words[1000];
-    char keys[1000][1000], values[1000][1000];
-    char memory[20][1024];
+    int i = 0, fd = 0, fd_err = 0, amper = 0, redirect = 0, retid = 0, status = 0, piping = 0, argc1 = 0,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes=0;
+    int fildes[2] = {0};
+    char *argv[100][1000] = {0};
+    char* words[1000] = {0};
+    char keys[1000][1000] = {0}, values[1000][1000] = {0};
+    char memory[20][1024] = {0};
     int location = 0, map_index = 0;
+    char c = '\0';
     while (1)
     {
         index++;
@@ -224,7 +226,7 @@ int main()
                 strcpy(command, else_command);
             }
         }
-
+        
         i = 0;
         token = strtok (command,"|");
         char* args_pipe[100];
@@ -332,15 +334,15 @@ int main()
             printf("%d\n", status);
             continue;
         }
-        if (!strcmp(argv[0][0], "echo"))
-        {
-            for (int j = 1; argv[0][j] != NULL; j++)
-            {
-                printf("%s ", argv[0][j]);
-            }
-            printf("\n");
-            continue;
-        }
+        // if (!strcmp(argv[0][0], "echo"))
+        // {
+        //     for (int j = 1; argv[0][j] != NULL; j++)
+        //     {
+        //         printf("%s ", argv[0][j]);
+        //     }
+        //     printf("\n");
+        //     continue;
+        // }
 
         // supporting a chain of redirection first error then output
         if ((argc1 > 3) && (!strcmp(argv[0][argc1 - 4], ">")) && (!strcmp(argv[0][argc1 - 2], "2>")))
