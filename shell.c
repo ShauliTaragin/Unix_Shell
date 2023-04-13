@@ -13,7 +13,6 @@ char *prompt_str = "hello";
 
 void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i){
     if(i==0){
-        printf("in\n");
         close(STDOUT_FILENO);
         dup(fildes[0][1]);
         close(fildes[0][1]);
@@ -89,13 +88,11 @@ int main()
     char *outfile;
     char *errfile;
     int i, fd, fd_err, amper, redirect, retid, status, piping, argc1,if_cond =-10,then_cond=-10,index=0,else_cond=-10,num_pipes;
-    int fildes[2];
     char *argv[100][1000];
     char* words[1000];
     char keys[1000][1000], values[1000][1000];
     char memory[20][1024];
     int location = 0, map_index = 0;
-    char c;
     while (1)
     {
         index++;
