@@ -407,11 +407,7 @@ int main()
                 /* stdout is now redirected and appended to outfile*/
             }
             if (piping){
-
-                if (fork() == 0){
-                    pipe_func(num_pipes,argv,pipes_fd,num_pipes-1);
-                    exit(0);
-                }
+                pipe_func(num_pipes,argv,pipes_fd,num_pipes-1);
 
             }
 
