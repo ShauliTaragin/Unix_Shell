@@ -20,7 +20,6 @@ void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i)
 
         execvp(pipes[0][0], pipes[0]);
         perror("Error executing command");
-        printf("%d\n",i);
         exit(1);
     }
     pipe(fildes[i-1]);
@@ -34,12 +33,10 @@ void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i)
         pipe_func(num_pipes,pipes,fildes,i-1);
     }
     else{
-        printf("%d,%ld,%ld\n",i,(long)getpid(), (long)getppid());
         /* Child process */
 
         if (i == num_pipes-1)
         {
-            printf("out\n");
             close(STDIN_FILENO);
             dup(fildes[i-1][0]);
             close(fildes[i-1][1]);
@@ -48,7 +45,6 @@ void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i)
         }
         else
         {
-            printf("not happen\n");
             close(STDIN_FILENO);
             dup(fildes[i-1][0]);
             close(STDOUT_FILENO);
@@ -65,7 +61,6 @@ void pipe_func(int num_pipes,char * pipes [100][1000],int fildes[1000][2],int i)
         /* Execute command */
         execvp(pipes[i][0], pipes[i]);
         perror("Error executing command");
-        printf("%d\n",i);
         exit(1);
     }
 }
@@ -330,15 +325,6 @@ int main()
         if (!strcmp(argv[0][0], "echo") && (argc1 == 2) && !strcmp(argv[0][1], "$?"))
         {
             printf("%d\n", status);
-            continue;
-        }
-        if (!strcmp(argv[0][0], "echo"))
-        {
-            for (int j = 1; argv[0][j] != NULL; j++)
-            {
-                printf("%s ", argv[0][j]);
-            }
-            printf("\n");
             continue;
         }
 
